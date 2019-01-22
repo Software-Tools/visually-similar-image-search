@@ -72,12 +72,23 @@ class Densenet(Model):
 
 
 class Squeezenet(Model):
-    def __init__(self):
+    def __init__(self, emb_size):
         super(Squeezenet, self).__init__()
 
+        self.emb_size = emb_size
         self.model = tvm.squeezenet1_1(pretrained=True)
 
-        self.features = nn.Sequential(*list(self.model.children())[:-3]).to(utils.torch_device())
+        self.classifier = nn.Sequential(
+            *list(self.model.classifier.children())[:4]).to(utils.torch_device()
+        )
+
+        # self.features = nn.Sequential(*list(self.model.children())[:-3]).to(utils.torch_device())
+    def forward_pass(self, batch):
+
+        x = self.model.features(batch)
+        x = self.classifier(x)
+
+        return x.view(batch.size(0), -1)
 
 
 class VAE(nn.Module):

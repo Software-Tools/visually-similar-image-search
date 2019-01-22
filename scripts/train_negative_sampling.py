@@ -27,6 +27,8 @@ parser.add_argument('--batch-size', type=int, default=128, metavar='N',
                     help='input batch size for training (default: 128)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
+parser.add_argument('--emb-size', type=int, default=1024, metavar='N',
+                    help='emb-size (default: 1024)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--lr', type=float, default=0.001, metavar='N',
@@ -109,54 +111,64 @@ testloader = torch.utils.data.DataLoader(test_noisy_dataset, batch_size=args.bat
 
 
 class Model(nn.Module):
-    def __init__(self, verbose=False):
+    def __init__(self, emb_size, verbose=False):
         super(Model, self).__init__()
-        self.vgg = models.VGG16()
-        self.encoder = nn.Sequential(
-            nn.Linear(3072+4096, 4096),
-            nn.ReLU(True)
+
+        self.pretrained_model = models.Squeezenet(emb_size=emb_size)
+
+        self.linear = nn.Sequential(
+            nn.Linear(1000, emb_size),
+            nn.Tanh(),
         )
 
-        self.path1 = nn.Sequential(
-            nn.MaxPool2d(4, 4),
-            nn.Conv2d(3, 96, 8, 4),
-            nn.MaxPool2d(6, 2),
-            Flatten(),
-        )
+        self.emb_size = emb_size
 
-        self.path2 = nn.Sequential(
-            nn.MaxPool2d(8, 8),
-            nn.Conv2d(3, 96, 8, 4),
-            nn.MaxPool2d(3, 1),
-            Flatten(),
-        )
-
-        self.dropout = nn.Dropout(p=0.2)
+        # self.encoder = nn.Sequential(
+        #     nn.Linear(3072+4096, 4096),
+        #     nn.ReLU(True)
+        # )
+        #
+        # self.path1 = nn.Sequential(
+        #     nn.MaxPool2d(4, 4),
+        #     nn.Conv2d(3, 96, 8, 4),
+        #     nn.MaxPool2d(6, 2),
+        #     Flatten(),
+        # )
+        #
+        # self.path2 = nn.Sequential(
+        #     nn.MaxPool2d(8, 8),
+        #     nn.Conv2d(3, 96, 8, 4),
+        #     nn.MaxPool2d(3, 1),
+        #     Flatten(),
+        # )
+        #
+        # self.dropout = nn.Dropout(p=0.2)
 
     def _normalize(self, x):
         norm = x.norm(p=2, dim=1, keepdim=True)
         return x.div(norm)
 
     def forward(self, x):
-        vgg_x = self._normalize(self.vgg.forward_pass(x))
+        return self.linear(self.pretrained_model.forward_pass(x))
 
-        path1_x = self.path1(x)
-        path2_x = self.path2(x)
-        p_x = self._normalize(torch.cat((path1_x, path2_x), dim=1))
 
-        x = torch.cat((vgg_x, p_x), dim=1)
-        x = self.dropout(x)
+        # path1_x = self.path1(x)
+        # path2_x = self.path2(x)
+        # p_x = self._normalize(torch.cat((path1_x, path2_x), dim=1))
+        #
+        # x = torch.cat((vgg_x, p_x), dim=1)
+        # x = self.dropout(x)
+        #
+        # x = self.encoder(x)
+        # return self._normalize(x)
 
-        x = self.encoder(x)
-        return self._normalize(x)
-
-    def parameters(self):
-        return list(self.encoder.parameters()) + list(self.path1.parameters()) + list(self.path2.parameters())
+    # def parameters(self):
+    #     return list(self.encoder.parameters()) + list(self.path1.parameters()) + list(self.path2.parameters())
 
 
 running_loss = []
 
-model = Model().to(device)
+model = Model(args.emb_size).to(device)
 triplet_loss = nn.TripletMarginLoss(margin=args.margin, p=2)
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
 print('margin = %f' % args.margin)
@@ -177,12 +189,12 @@ for epoch in range(args.epochs):
         # print statistics
         running_loss.append(loss.item())
         if i % args.log_interval == 0:
-            print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, np.mean(running_loss)))
+            print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, np.mean(running_loss)))
             running_loss = []
 
 print('Computing features for testing set')
 
-embeddings = np.zeros((len(testloader.dataset), 4096))
+embeddings = np.zeros((len(testloader.dataset), args.emb_size))
 test_loss = []
 with torch.no_grad():
     for i, data in enumerate(testloader):
