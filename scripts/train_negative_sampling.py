@@ -203,7 +203,7 @@ for epoch in range(args.epochs):
         optimizer.step()
 
         # print statistics
-        running_loss.append(loss.item())
+        running_loss.append(loss.item()*x.shape[0])
         if i % args.log_interval == 0:
             print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, np.mean(running_loss)))
             running_loss = []
