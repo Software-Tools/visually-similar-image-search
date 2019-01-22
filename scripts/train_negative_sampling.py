@@ -135,7 +135,6 @@ class Model(nn.Module):
 
         self.linear = nn.Sequential(
             nn.Linear(4096, emb_size),
-            nn.Tanh(),
         )
 
         self.emb_size = emb_size
