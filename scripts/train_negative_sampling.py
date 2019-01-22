@@ -114,10 +114,11 @@ class Model(nn.Module):
     def __init__(self, emb_size, verbose=False):
         super(Model, self).__init__()
 
-        self.pretrained_model = models.Squeezenet(emb_size=emb_size)
+        # self.pretrained_model = models.Squeezenet(emb_size=emb_size)
+        self.pretrained_model = models.VGG16()
 
         self.linear = nn.Sequential(
-            nn.Linear(1000, emb_size),
+            nn.Linear(4096, emb_size),
             nn.Tanh(),
         )
 
