@@ -196,7 +196,6 @@ for epoch in range(args.epochs):
         optimizer.zero_grad()
 
         x, cx, y = data
-
         zx, zcx, y = model(x.to(device)), model(cx.to(device)), y.to(device)
         loss = contastive_loss(zx, zcx, y)
 
@@ -208,6 +207,18 @@ for epoch in range(args.epochs):
         if i % args.log_interval == 0:
             print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, np.mean(running_loss)))
             running_loss = []
+
+    val_loss = []
+    model.eval()
+    for k, data in enumerate(testloader):
+
+        x, cx, y = data
+        zx, zcx, y = model(x.to(device)), model(cx.to(device)), y.to(device)
+        loss = contastive_loss(zx, zcx, y)
+
+        val_loss.append(loss.item() * x.shape[0])
+
+    print('>> Val-loss: %f' % np.mean(val_loss))
 
 print('Computing features for testing set')
 
