@@ -85,12 +85,15 @@ class NoisyImageDataset(object):
     def __getitem__(self, index):
         image, x = self._load_and_transform(index)
 
-        pos_x = self.noisy_transform(image)
+        target = np.random.randint(0, 2)
 
-        ridx = random_choice_without_i(self.total_data, index)
-        _, neg_x = self._load_and_transform(ridx)
+        if target == 1:
+            cx = self.noisy_transform(image)
+        else:
+            ridx = random_choice_without_i(self.total_data, index)
+            _, cx = self._load_and_transform(ridx)
 
-        return x, pos_x, neg_x
+        return x, cx, torch.tensor(target).type(torch.FloatTensor)
 
     def _load_and_transform(self, index):
         image_path = self.image_paths[index]
@@ -188,14 +191,14 @@ print('margin = %f' % args.margin)
 print('learning rate = %f' % args.lr)
 
 for epoch in range(args.epochs):
-    model.train()
     for i, data in enumerate(trainloader, 0):
 
         optimizer.zero_grad()
 
-        x, px, nx = data
-        zx, zpx, znx = model(x.to(device)), model(px.to(device)), model(nx.to(device))
-        loss = triplet_loss(zx, zpx, znx)
+        x, cx, y = data
+
+        zx, zcx, y = model(x.to(device)), model(cx.to(device)), y.to(device)
+        loss = contastive_loss(zx, zcx, y)
 
         loss.backward()
         optimizer.step()
@@ -205,18 +208,6 @@ for epoch in range(args.epochs):
         if i % args.log_interval == 0:
             print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, np.mean(running_loss)))
             running_loss = []
-
-        # todo: loss testing set
-    val_loss = []
-    model.eval()
-    for k, data in enumerate(testloader):
-        x, px, nx = data
-        zx, zpx, znx = model(x.to(device)), model(px.to(device)), model(nx.to(device))
-        loss = triplet_loss(zx, zpx, znx)
-
-        val_loss.append(loss.item()*x.shape[0])
-
-    print('>> Val-loss: %f' % np.mean(val_loss))
 
 print('Computing features for testing set')
 
