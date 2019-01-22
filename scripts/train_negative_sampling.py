@@ -93,7 +93,7 @@ class NoisyImageDataset(object):
             ridx = random_choice_without_i(self.total_data, index)
             _, cx = self._load_and_transform(ridx)
 
-        return x, cx, torch.tensor(target).type(torch.FloatTensor).to(utils.torch_device())
+        return x, cx, torch.tensor(target).type(torch.FloatTensor)
 
     def _load_and_transform(self, index):
         image_path = self.image_paths[index]
@@ -199,7 +199,7 @@ for epoch in range(args.epochs):
 
         x, cx, y = data
 
-        zx, zcx = model(x.to(device)), model(cx.to(device))
+        zx, zcx, y = model(x.to(device)), model(cx.to(device)), y.to(device)
         loss = contastive_loss(zx, zcx, y)
 
         loss.backward()
