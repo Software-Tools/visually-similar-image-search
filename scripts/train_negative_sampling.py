@@ -84,12 +84,16 @@ class NoisyImageDataset(object):
 
     def __getitem__(self, index):
         image, x = self._load_and_transform(index)
-        pos_x = self.noisy_transform(image)
 
-        ridx = random_choice_without_i(self.total_data, index)
-        _, neg_x = self._load_and_transform(ridx)
+        target = np.random.randint(0, 2)
 
-        return x, pos_x, neg_x
+        if target == 1:
+            cx = self.noisy_transform(image)
+        else:
+            ridx = random_choice_without_i(self.total_data, index)
+            _, cx = self._load_and_transform(ridx)
+
+        return x, cx, torch.tensor(target).type(torch.FloatTensor)
 
     def _load_and_transform(self, index):
         image_path = self.image_paths[index]
@@ -108,6 +112,19 @@ trainloader = torch.utils.data.DataLoader(noisy_dataset, batch_size=args.batch_s
 
 test_noisy_dataset = NoisyImageDataset(args.test_dir, transform=base_transform, noisy_transform=noisy_transform)
 testloader = torch.utils.data.DataLoader(test_noisy_dataset, batch_size=args.batch_size, shuffle=False, num_workers=1)
+
+
+def contastive_loss(x, x_sampling, take_pos, margin=1.0):
+    distance = (x - x_sampling).norm(p=2, dim=1, keepdim=True)
+
+    take_pos = take_pos.view(-1, 1)
+    pos_part = take_pos * distance.pow(2)
+    neg_part = (1.0 - take_pos) * F.relu(margin - distance).pow(2)
+
+    loss = 0.5 * (pos_part + neg_part)
+    print(loss.size())
+    return loss.mean()
+
 
 
 class Model(nn.Module):
@@ -180,9 +197,10 @@ for epoch in range(args.epochs):
 
         optimizer.zero_grad()
 
-        z = list(map(lambda x: model(x.to(device)), data))
+        x, cx, y = data
 
-        loss = triplet_loss(*z)
+        zx, zcx = model(x.to(device)), model(cx.to(device))
+        loss = contastive_loss(zx, zcx, y)
 
         loss.backward()
         optimizer.step()
