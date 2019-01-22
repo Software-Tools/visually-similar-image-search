@@ -122,7 +122,6 @@ def contastive_loss(x, x_sampling, take_pos, margin=1.0):
     neg_part = (1.0 - take_pos) * F.relu(margin - distance).pow(2)
 
     loss = 0.5 * (pos_part + neg_part)
-    print(loss.size())
     return loss.mean()
 
 
